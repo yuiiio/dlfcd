@@ -37,6 +37,10 @@ fn main() {
     let mut fan_control_data: u64 = (1 as u64) << 32 | 0 as u64;
     // upper u32: {fan_speed [0, 1, 2]}
     // down u32: {0: right_fan, 1: left_fan}
+    unsafe {
+        let _ = i8k_fan_set(i8k_fd, &mut fan_control_data);
+    }
+    let mut pre_fan_status: bool = true;
     println!("start dlfcd");
     loop {
         let mut file = File::open(&path_v).unwrap();
@@ -45,21 +49,29 @@ fn main() {
             .chars().filter(|c| pass_char(*c))
             .collect::<String>();
         let raw_value = val_str.parse::<u32>().unwrap();
-        println!("temp: {}", raw_value);
+        //println!("temp: {}", raw_value);
 
         if raw_value > 60000 {
-            fan_control_data = (1 as u64) << 32 | 0 as u64; // right mid
-            unsafe {
-                let _ = i8k_fan_set(i8k_fd, &mut fan_control_data);
+            if pre_fan_status == false {
+                //println!("fan speed to mid");
+                fan_control_data = (1 as u64) << 32 | 0 as u64; // right mid
+                unsafe {
+                    let _ = i8k_fan_set(i8k_fd, &mut fan_control_data);
+                }
+                pre_fan_status = true;
             }
         } else {
-            fan_control_data = (0 as u64) << 32 | 0 as u64; // right off
-            unsafe {
-                let _ = i8k_fan_set(i8k_fd, &mut fan_control_data);
+            if pre_fan_status == true {
+                //println!("fan stop");
+                fan_control_data = (0 as u64) << 32 | 0 as u64; // right off
+                unsafe {
+                    let _ = i8k_fan_set(i8k_fd, &mut fan_control_data);
+                }
+                pre_fan_status = false;
             }
         }
 
-        thread::sleep(Duration::from_secs(1));
+        thread::sleep(Duration::from_secs(5));
     }
 
     /*
